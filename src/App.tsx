@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Send, Sparkles, Settings, Key, RefreshCw, Play, 
-  CheckCircle2, XCircle, AlertCircle, Database
+  CheckCircle2, XCircle, AlertCircle, Database,
+  Image, Cpu, Lock, Layout, Terminal, Code2, X
 } from 'lucide-react';
 import { 
   getWorkbookData, 
@@ -47,6 +48,7 @@ export default function App({ isExcel }: AppProps) {
   const [workbookData, setWorkbookData] = useState<WorkbookData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncingSheet, setIsSyncingSheet] = useState(false);
+  const [showShowcase, setShowShowcase] = useState(!isExcel);
   
   const activeSheetData = workbookData
     ? workbookData.sheets.find(s => s.name === workbookData.activeSheetName) || workbookData.sheets[0]
@@ -386,6 +388,23 @@ export default function App({ isExcel }: AppProps) {
         
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <button 
+            className={`suggestion-chip ${!isExcel && !showShowcase ? 'pulse' : ''}`}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '4px', 
+              background: showShowcase ? 'rgba(139, 92, 246, 0.15)' : 'rgba(255, 255, 255, 0.04)', 
+              borderColor: showShowcase ? 'rgba(139, 92, 246, 0.3)' : 'var(--border-color)',
+              color: showShowcase ? '#c084fc' : 'var(--text-secondary)'
+            }}
+            onClick={() => setShowShowcase(!showShowcase)}
+            title="Tampilkan Portofolio & Fitur Proyek"
+          >
+            <Sparkles size={12} />
+            Info & Fitur
+          </button>
+
+          <button 
             className="suggestion-chip" 
             style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }}
             onClick={syncSheetInfo}
@@ -410,8 +429,10 @@ export default function App({ isExcel }: AppProps) {
         </div>
       </header>
 
-      {/* Main Chat Pane */}
-      <div className="chat-pane">
+      {/* Main Layout Area */}
+      <div className="main-content-layout">
+        {/* Main Chat Pane */}
+        <div className="chat-pane" style={{ flex: 1, height: '100%' }}>
         
         {/* Panel API Key Settings */}
         {showSettings && (
@@ -626,6 +647,12 @@ export default function App({ isExcel }: AppProps) {
             </div>
           )}
         </div>
+        </div>
+
+        {/* Recruiter Showcase Panel */}
+        {showShowcase && (
+          <RecruiterShowcase onClose={() => setShowShowcase(false)} />
+        )}
       </div>
     </div>
   );
@@ -670,4 +697,230 @@ function getStepDescription(action: any): string {
     default:
       return `Eksekusi aksi: ${action.type}`;
   }
+}
+
+interface RecruiterShowcaseProps {
+  onClose: () => void;
+}
+
+function RecruiterShowcase({ onClose }: RecruiterShowcaseProps) {
+  const [activeTab, setActiveTab] = React.useState<'screenshot' | 'features' | 'tech'>('screenshot');
+
+  return (
+    <div className="showcase-panel">
+      <div className="showcase-header">
+        <h2>
+          <Sparkles size={15} style={{ color: 'var(--accent-secondary)' }} />
+          Portofolio & Fitur Proyek
+        </h2>
+        <button onClick={onClose} className="showcase-close-btn" title="Tutup Panel">
+          <X size={15} />
+        </button>
+      </div>
+
+      <div className="showcase-tabs">
+        <button 
+          className={`showcase-tab-btn ${activeTab === 'screenshot' ? 'active' : ''}`}
+          onClick={() => setActiveTab('screenshot')}
+        >
+          <Image size={13} />
+          Demo & Mockup
+        </button>
+        <button 
+          className={`showcase-tab-btn ${activeTab === 'features' ? 'active' : ''}`}
+          onClick={() => setActiveTab('features')}
+        >
+          <Layout size={13} />
+          Fitur Utama
+        </button>
+        <button 
+          className={`showcase-tab-btn ${activeTab === 'tech' ? 'active' : ''}`}
+          onClick={() => setActiveTab('tech')}
+        >
+          <Cpu size={13} />
+          Teknologi & Arsitektur
+        </button>
+      </div>
+
+      <div className="showcase-content">
+        {activeTab === 'screenshot' && (
+          <>
+            <div className="showcase-section-title">
+              <Image size={12} />
+              Tampilan Add-in di Excel
+            </div>
+            
+            <div className="screenshot-card">
+              <div className="screenshot-image-wrapper">
+                <img 
+                  src="/excel_addin_showcase.png" 
+                  alt="Excel AI Assistant Showcase" 
+                  className="screenshot-image"
+                  onError={(e) => {
+                    e.currentTarget.src = 'https://placehold.co/600x400/0f172a/f8fafc?text=AI+Excel+Assistant+Mockup';
+                  }}
+                />
+                <span className="screenshot-badge">Simulasi Excel</span>
+              </div>
+              <div className="screenshot-info">
+                <h3>Integrasi Side-by-Side dengan Excel</h3>
+                <p>
+                  Gambar di atas menyimulasikan bagaimana AI Excel Assistant berjalan sebagai panel samping (taskpane) di dalam Microsoft Excel Desktop maupun Excel Web. Pengguna dapat mengobrol dengan AI, dan AI akan mengontrol spreadsheet secara real-time dan aman.
+                </p>
+              </div>
+            </div>
+
+            <div className="architecture-card" style={{ marginTop: '10px' }}>
+              <Terminal size={20} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+              <div className="architecture-text">
+                <h4>Siap untuk HR & Recruiter Review</h4>
+                <p style={{ fontSize: '11px', lineHeight: '1.5' }}>
+                  Aplikasi ini dirancang dengan standar kualitas tinggi: kode terstruktur menggunakan TypeScript, integrasi API AI yang modular, dan kepatuhan penuh terhadap Office Add-in manifest.
+                </p>
+              </div>
+            </div>
+          </>
+        )}
+
+        {activeTab === 'features' && (
+          <>
+            <div className="showcase-section-title">
+              <Layout size={12} />
+              Kemampuan Otomatisasi AI
+            </div>
+
+            <div className="features-grid">
+              <div className="feature-card">
+                <div className="feature-icon-wrapper">
+                  <Code2 size={15} />
+                </div>
+                <div className="feature-details">
+                  <h3>1. Generator Rumus Instan</h3>
+                  <p>Menghasilkan rumus Excel yang kompleks (seperti SUMIFS, VLOOKUP, INDEX/MATCH) berdasarkan perintah bahasa sehari-hari dan langsung menulisnya ke sel.</p>
+                  <span className="feature-api-badge">range.formulas = [...]</span>
+                </div>
+              </div>
+
+              <div className="feature-card">
+                <div className="feature-icon-wrapper" style={{ color: 'var(--accent-secondary)', borderColor: 'rgba(139, 92, 246, 0.2)', background: 'rgba(139, 92, 246, 0.08)' }}>
+                  <Database size={15} />
+                </div>
+                <div className="feature-details">
+                  <h3>2. Pembuat Excel Table Otomatis</h3>
+                  <p>Mendeteksi jangkauan data (range) secara otomatis dan memformat data mentah menjadi Excel Table resmi dengan sekali klik.</p>
+                  <span className="feature-api-badge">worksheet.tables.add()</span>
+                </div>
+              </div>
+
+              <div className="feature-card">
+                <div className="feature-icon-wrapper">
+                  <RefreshCw size={15} />
+                </div>
+                <div className="feature-details">
+                  <h3>3. Pengurutan & Penyaringan Data</h3>
+                  <p>Mendukung pengurutan kolom secara naik/turun dan menerapkan filter kustom pada tabel Excel secara terprogram melalui perintah AI.</p>
+                  <span className="feature-api-badge">table.sort / table.column.filter</span>
+                </div>
+              </div>
+
+              <div className="feature-card">
+                <div className="feature-icon-wrapper" style={{ color: 'var(--accent-secondary)', borderColor: 'rgba(139, 92, 246, 0.2)', background: 'rgba(139, 92, 246, 0.08)' }}>
+                  <Sparkles size={15} />
+                </div>
+                <div className="feature-details">
+                  <h3>4. Pembuat Grafik & Diagram</h3>
+                  <p>Membaca data sheet lalu membuat grafik representatif (batang, kolom, garis, atau lingkaran) secara otomatis untuk visualisasi cepat.</p>
+                  <span className="feature-api-badge">worksheet.charts.add()</span>
+                </div>
+              </div>
+
+              <div className="feature-card">
+                <div className="feature-icon-wrapper">
+                  <Layout size={15} />
+                </div>
+                <div className="feature-details">
+                  <h3>5. Generator Pivot Table</h3>
+                  <p>Membuat ringkasan Pivot Table interaktif dari database yang besar dengan konfigurasi field baris dan kolom yang disesuaikan.</p>
+                  <span className="feature-api-badge">worksheet.pivotTables.add()</span>
+                </div>
+              </div>
+
+              <div className="feature-card">
+                <div className="feature-icon-wrapper" style={{ color: 'var(--accent-secondary)', borderColor: 'rgba(139, 92, 246, 0.2)', background: 'rgba(139, 92, 246, 0.08)' }}>
+                  <Cpu size={15} />
+                </div>
+                <div className="feature-details">
+                  <h3>6. Sinkronisasi Data Sheet Dinamis</h3>
+                  <p>Membaca metadata sheet aktif, header kolom, jumlah baris, dan rumus yang terpasang agar AI memahami konteks data sebelum memberikan aksi.</p>
+                  <span className="feature-api-badge">worksheet.getSelectedRange()</span>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {activeTab === 'tech' && (
+          <>
+            <div className="showcase-section-title">
+              <Cpu size={12} />
+              Teknologi & Keunggulan Kode
+            </div>
+
+            <div className="tech-container">
+              <div className="tech-group">
+                <div className="tech-group-title" style={{ color: 'var(--accent-primary)' }}>
+                  <Layout size={12} style={{ color: 'var(--accent-primary)' }} />
+                  Frontend & Integrasi
+                </div>
+                <div className="tech-badge-container">
+                  <span className="tech-badge">React 18</span>
+                  <span className="tech-badge">TypeScript</span>
+                  <span className="tech-badge">Vite Builder</span>
+                  <span className="tech-badge">Office JS SDK</span>
+                  <span className="tech-badge">Lucide Icons</span>
+                  <span className="tech-badge">Custom CSS Variables</span>
+                </div>
+              </div>
+
+              <div className="tech-group">
+                <div className="tech-group-title" style={{ color: 'var(--accent-secondary)' }}>
+                  <Cpu size={12} style={{ color: 'var(--accent-secondary)' }} />
+                  AI Orchestrator Engine
+                </div>
+                <div className="tech-badge-container">
+                  <span className="tech-badge">Google Gemini API</span>
+                  <span className="tech-badge">DeepSeek AI API</span>
+                  <span className="tech-badge">Structured JSON Output</span>
+                  <span className="tech-badge">Modular Command Pattern</span>
+                </div>
+              </div>
+
+              <div className="tech-group">
+                <div className="tech-group-title" style={{ color: '#f43f5e' }}>
+                  <Lock size={12} style={{ color: '#f43f5e' }} />
+                  Keamanan & Praktik Terbaik
+                </div>
+                <div className="tech-badge-container">
+                  <span className="tech-badge">Local API Keys</span>
+                  <span className="tech-badge">No Third-party DB</span>
+                  <span className="tech-badge">Transaction Batching</span>
+                  <span className="tech-badge">Graceful Fallbacks</span>
+                </div>
+              </div>
+
+              <div className="architecture-card">
+                <Lock size={20} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+                <div className="architecture-text">
+                  <h4>Privasi Data Terjamin</h4>
+                  <p style={{ fontSize: '11px', lineHeight: '1.5' }}>
+                    Kunci API disimpan secara lokal di browser (`localStorage`) dan tidak pernah dikirim ke server pihak ketiga mana pun. Kunci ini hanya digunakan untuk mengautentikasi langsung ke Google / DeepSeek API.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
