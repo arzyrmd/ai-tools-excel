@@ -16,7 +16,7 @@
   </Hosts>
   
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://ai-tools-excel-qioe.vercel.app/index.html" />
+    <SourceLocation DefaultValue="https://ai-tools-excel-qioe.vercel.app" />
   </DefaultSettings>
   
   <Permissions>ReadWriteDocument</Permissions>
