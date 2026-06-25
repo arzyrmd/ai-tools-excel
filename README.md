@@ -94,7 +94,7 @@ Untuk melihat asisten AI ini terintegrasi di dalam lembar kerja Microsoft Excel 
 ## 🌟 Demo Browser (Mode Demo Interaktif)
 Jika Anda tidak memiliki akses ke Microsoft Excel Desktop atau hanya ingin meninjau antarmuka UI/UX, Anda dapat mengunjungi tautan demo Vercel proyek ini:
 
-🔗 **[Tautan Live Demo Vercel](https://your-vercel-link.vercel.app)** *(Ganti dengan tautan Vercel Anda)*
+🔗 **[Tautan Live Demo Vercel](https://ai-tools-excel-qioe.vercel.app/)**
 
 *Catatan: Saat dijalankan langsung di browser, aplikasi akan berjalan dalam **Demo Mode** (menampilkan visualisasi portofolio & fitur di sebelah kanan, serta tetap mengizinkan Anda mengobrol dengan asisten untuk melihat Rencana Aksi yang diusulkan).*
 

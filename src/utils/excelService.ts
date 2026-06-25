@@ -328,7 +328,7 @@ export async function createExcelChart(
     
     // Map string tipe grafik ke enum Excel.ChartType
     let chartType = Excel.ChartType.columnClustered; // Default
-    const typeLower = chartTypeStr.toLowerCase();
+    const typeLower = (chartTypeStr || 'column').toLowerCase();
     
     if (typeLower.includes('line')) {
       chartType = Excel.ChartType.line;
@@ -340,10 +340,17 @@ export async function createExcelChart(
       chartType = Excel.ChartType.area;
     }
 
-    const dataRange = sheet.getRange(dataRangeAddress);
+    let dataRange: Excel.Range;
+    if (dataRangeAddress) {
+      dataRange = sheet.getRange(dataRangeAddress);
+    } else {
+      // Ambil used range secara otomatis jika dataRangeAddress kosong
+      dataRange = sheet.getUsedRange();
+    }
+    
     const chart = sheet.charts.add(chartType, dataRange, Excel.ChartSeriesBy.auto);
     
-    chart.title.text = title;
+    chart.title.text = title || "Grafik Data AI";
     chart.title.visible = true;
     
     // Posisikan grafik di sebelah kanan data (misal bergeser 2 kolom ke kanan)

@@ -368,13 +368,13 @@ Format Output JSON Harus Tepat Seperti Ini:
 }
 
 Ketentuan Tipe Aksi:
-- "CREATE_TABLE": mengonversi range data menjadi objek Tabel Excel tepercaya.
-- "WRITE_FORMULAS": menulis array 2D rumus (string[][]) ke range tertentu.
-- "WRITE_VALUES": menulis nilai mentah biasa ke range sel tertentu.
-- "SORT": mengurutkan kolom pada tabel.
-- "FILTER": memfilter kolom pada tabel.
-- "CREATE_CHART": membuat diagram grafis Excel asli.
-- "CREATE_PIVOT": membuat Pivot Table di sheet baru.
+- "CREATE_TABLE": mengonversi range data menjadi objek Tabel Excel tepercaya (mempermudah sort/filter). Membutuhkan "range" (rentang data tabel) dan "name" (nama tabel).
+- "WRITE_FORMULAS": menulis array 2D rumus (string[][]) ke range tertentu. Baris header tidak boleh ditulis di sini, gunakan WRITE_VALUES untuk menulis teks/nilai biasa.
+- "WRITE_VALUES": menulis nilai mentah biasa (string/number/array 2D) ke range sel tertentu.
+- "SORT": mengurutkan kolom pada tabel. Membutuhkan "tableName", "columnName", dan "direction" ('asc' atau 'desc').
+- "FILTER": memfilter kolom pada tabel. Membutuhkan "tableName", "columnName", "value", dan "operator" ('Equal' | 'Contains' | 'GreaterThan' | 'LessThan' | 'Clear').
+- "CREATE_CHART": membuat diagram grafis Excel asli. Membutuhkan "type" ('bar'|'line'|'pie'|'area'), "range" (rentang data grafik, contoh: "A1:G11" atau nama tabel "DataNilaiSiswa"), dan "title".
+- "CREATE_PIVOT": membuat Pivot Table di sheet baru. Membutuhkan "source" (range/tabel asal), "rowFields" (array nama kolom baris), dan "dataFields" (array nama kolom nilai numerik).
 
 Hanya hasilkan format JSON valid tanpa markdown tambahan.
 `;
