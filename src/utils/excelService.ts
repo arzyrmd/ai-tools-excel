@@ -342,7 +342,76 @@ export async function createExcelChart(
 
     let dataRange: Excel.Range;
     if (dataRangeAddress) {
-      dataRange = sheet.getRange(dataRangeAddress);
+      if (dataRangeAddress.includes(',')) {
+        // Rentang non-kontigu terdeteksi (contoh: Sheet1!B1:B11,Sheet1!F1:F11)
+        // Kita hitung bounding range kontigu yang melingkupi semua area
+        const areas = dataRangeAddress.split(',');
+        let minCol = Infinity;
+        let maxCol = -Infinity;
+        let minRow = Infinity;
+        let maxRow = -Infinity;
+        let sheetPrefix = "";
+
+        const firstArea = areas[0].trim();
+        if (firstArea.includes('!')) {
+          sheetPrefix = firstArea.split('!')[0] + '!';
+        }
+
+        for (const area of areas) {
+          const trimmedArea = area.trim();
+          const cleanArea = trimmedArea.includes('!') ? trimmedArea.split('!')[1] : trimmedArea;
+          const parts = cleanArea.split(':');
+          const start = parts[0];
+          const end = parts[1] || start;
+
+          // Helper untuk memparsing cell seperti "B1" atau "AA12"
+          const parseCell = (cellStr: string) => {
+            const match = cellStr.match(/^([A-Z]+)([0-9]+)$/i);
+            if (match) {
+              const colLetters = match[1].toUpperCase();
+              const rowNum = parseInt(match[2], 10);
+              
+              let colIdx = 0;
+              for (let i = 0; i < colLetters.length; i++) {
+                colIdx = colIdx * 26 + (colLetters.charCodeAt(i) - 64);
+              }
+              colIdx = colIdx - 1; // 0-indexed
+              return { colIdx, rowNum };
+            }
+            return null;
+          };
+
+          const startCoord = parseCell(start);
+          const endCoord = parseCell(end);
+
+          if (startCoord && endCoord) {
+            minCol = Math.min(minCol, startCoord.colIdx, endCoord.colIdx);
+            maxCol = Math.max(maxCol, startCoord.colIdx, endCoord.colIdx);
+            minRow = Math.min(minRow, startCoord.rowNum, endCoord.rowNum);
+            maxRow = Math.max(maxRow, startCoord.rowNum, endCoord.rowNum);
+          }
+        }
+
+        if (minCol !== Infinity) {
+          const getColLetter = (idx: number): string => {
+            let letter = '';
+            let temp = idx;
+            while (temp >= 0) {
+              letter = String.fromCharCode((temp % 26) + 65) + letter;
+              temp = Math.floor(temp / 26) - 1;
+            }
+            return letter;
+          };
+
+          const boundingAddress = `${sheetPrefix}${getColLetter(minCol)}${minRow}:${getColLetter(maxCol)}${maxRow}`;
+          console.log(`Mengonversi range non-kontigu "${dataRangeAddress}" menjadi bounding range "${boundingAddress}"`);
+          dataRange = sheet.getRange(boundingAddress);
+        } else {
+          dataRange = sheet.getRange(areas[0].trim());
+        }
+      } else {
+        dataRange = sheet.getRange(dataRangeAddress);
+      }
     } else {
       // Ambil used range secara otomatis jika dataRangeAddress kosong
       dataRange = sheet.getUsedRange();
@@ -424,6 +493,309 @@ export async function createExcelPivotTable(
     });
 
     pivotSheet.activate();
+    await context.sync();
+  });
+}
+
+export interface CellFormatOptions {
+  fillColor?: string;
+  fontColor?: string;
+  fontSize?: number;
+  bold?: boolean;
+  italic?: boolean;
+  fontName?: string;
+  horizontalAlignment?: 'Left' | 'Center' | 'Right' | 'General';
+  verticalAlignment?: 'Top' | 'Center' | 'Bottom';
+  borderStyle?: 'None' | 'Thin' | 'DoubleBottom' | 'AllBorders' | 'HeaderBorders' | 'TotalBorders';
+}
+
+/**
+ * Memformat format angka (currency, percent, date, dll) pada range sel tertentu.
+ */
+export async function formatNumbers(rangeAddress: string, formatCode: string): Promise<void> {
+  // @ts-ignore
+  return Excel.run(async (context) => {
+    const sheet = context.workbook.worksheets.getActiveWorksheet();
+    const range = sheet.getRange(rangeAddress);
+    
+    // Map format code yang umum
+    let resolvedFormat = formatCode;
+    const lowerFormat = formatCode.toLowerCase();
+    
+    if (lowerFormat === 'rupiah' || lowerFormat === 'rp' || lowerFormat === 'idr' || lowerFormat.includes('rp')) {
+      resolvedFormat = '"Rp"#,##0';
+    } else if (lowerFormat === 'usd' || lowerFormat === 'dollar' || lowerFormat === '$') {
+      resolvedFormat = '"$"#,##0';
+    } else if (lowerFormat === 'percent' || lowerFormat === 'persen' || lowerFormat === '%') {
+      resolvedFormat = '0.00%';
+    } else if (lowerFormat === 'date' || lowerFormat === 'tanggal') {
+      resolvedFormat = 'yyyy-mm-dd';
+    } else if (lowerFormat === 'number' || lowerFormat === 'angka') {
+      resolvedFormat = '#,##0';
+    } else if (lowerFormat === 'decimal' || lowerFormat === 'desimal') {
+      resolvedFormat = '#,##0.00';
+    }
+    
+    range.numberFormat = [[resolvedFormat]];
+    await context.sync();
+  });
+}
+
+/**
+ * Memformat gaya sel (warna, font, garis tepi, perataan) pada range sel tertentu.
+ */
+export async function formatCells(rangeAddress: string, options: CellFormatOptions): Promise<void> {
+  // @ts-ignore
+  return Excel.run(async (context) => {
+    const sheet = context.workbook.worksheets.getActiveWorksheet();
+    const range = sheet.getRange(rangeAddress);
+    const format = range.format;
+    
+    if (options.fillColor) {
+      format.fill.color = options.fillColor;
+    }
+    if (options.fontColor) {
+      format.font.color = options.fontColor;
+    }
+    if (options.fontSize) {
+      format.font.size = options.fontSize;
+    }
+    if (options.bold !== undefined) {
+      format.font.bold = options.bold;
+    }
+    if (options.italic !== undefined) {
+      format.font.italic = options.italic;
+    }
+    if (options.fontName) {
+      format.font.name = options.fontName;
+    }
+    if (options.horizontalAlignment) {
+      format.horizontalAlignment = options.horizontalAlignment;
+    }
+    if (options.verticalAlignment) {
+      format.verticalAlignment = options.verticalAlignment;
+    }
+    
+    if (options.borderStyle) {
+      const borders = format.borders;
+      if (options.borderStyle === 'None') {
+        borders.load('items');
+        await context.sync();
+        borders.items.forEach(border => {
+          border.style = 'None';
+        });
+      } else if (options.borderStyle === 'Thin' || options.borderStyle === 'AllBorders') {
+        const borderIndices = ['EdgeTop', 'EdgeBottom', 'EdgeLeft', 'EdgeRight', 'InsideHorizontal', 'InsideVertical'] as const;
+        borderIndices.forEach(index => {
+          const b = borders.getItem(index);
+          b.style = 'Continuous';
+          b.weight = 'Thin';
+          b.color = '#cbd5e1'; // slate-300
+        });
+      } else if (options.borderStyle === 'DoubleBottom' || options.borderStyle === 'TotalBorders') {
+        const topBorder = borders.getItem('EdgeTop');
+        topBorder.style = 'Continuous';
+        topBorder.weight = 'Thin';
+        topBorder.color = '#cbd5e1';
+        
+        const bottomBorder = borders.getItem('EdgeBottom');
+        bottomBorder.style = 'Double';
+        bottomBorder.weight = 'Medium';
+        bottomBorder.color = '#475569';
+      } else if (options.borderStyle === 'HeaderBorders') {
+        const bottomBorder = borders.getItem('EdgeBottom');
+        bottomBorder.style = 'Continuous';
+        bottomBorder.weight = 'Medium';
+        bottomBorder.color = '#1e293b';
+      }
+    }
+    await context.sync();
+  });
+}
+
+/**
+ * Menyisipkan sel/baris/kolom baru.
+ */
+export async function insertRange(rangeAddress: string, shift: 'Down' | 'Right'): Promise<void> {
+  // @ts-ignore
+  return Excel.run(async (context) => {
+    const sheet = context.workbook.worksheets.getActiveWorksheet();
+    const range = sheet.getRange(rangeAddress);
+    const shiftDirection = shift === 'Down' ? Excel.InsertShiftDirection.down : Excel.InsertShiftDirection.right;
+    range.insert(shiftDirection);
+    await context.sync();
+  });
+}
+
+/**
+ * Menghapus sel/baris/kolom.
+ */
+export async function deleteRange(rangeAddress: string, shift: 'Up' | 'Left'): Promise<void> {
+  // @ts-ignore
+  return Excel.run(async (context) => {
+    const sheet = context.workbook.worksheets.getActiveWorksheet();
+    const range = sheet.getRange(rangeAddress);
+    const shiftDirection = shift === 'Up' ? Excel.DeleteShiftDirection.up : Excel.DeleteShiftDirection.left;
+    range.delete(shiftDirection);
+    await context.sync();
+  });
+}
+
+/**
+ * Menghapus format/konten di range tertentu.
+ */
+export async function clearRange(rangeAddress: string, option: 'All' | 'Formats' | 'Contents'): Promise<void> {
+  // @ts-ignore
+  return Excel.run(async (context) => {
+    const sheet = context.workbook.worksheets.getActiveWorksheet();
+    const range = sheet.getRange(rangeAddress);
+    if (option === 'Formats') {
+      range.clear(Excel.ClearApplyTo.formats);
+    } else if (option === 'Contents') {
+      range.clear(Excel.ClearApplyTo.contents);
+    } else {
+      range.clear(Excel.ClearApplyTo.all);
+    }
+    await context.sync();
+  });
+}
+
+/**
+ * Menggabungkan atau memisahkan sel.
+ */
+export async function mergeCells(rangeAddress: string, merge: boolean): Promise<void> {
+  // @ts-ignore
+  return Excel.run(async (context) => {
+    const sheet = context.workbook.worksheets.getActiveWorksheet();
+    const range = sheet.getRange(rangeAddress);
+    if (merge) {
+      range.merge();
+    } else {
+      range.unmerge();
+    }
+    await context.sync();
+  });
+}
+
+/**
+ * Menyesuaikan lebar kolom/tinggi baris otomatis.
+ */
+export async function autofitRange(rangeAddress: string, option: 'columns' | 'rows' | 'both'): Promise<void> {
+  // @ts-ignore
+  return Excel.run(async (context) => {
+    const sheet = context.workbook.worksheets.getActiveWorksheet();
+    const range = sheet.getRange(rangeAddress);
+    if (option === 'columns' || option === 'both') {
+      range.format.autofitColumns();
+    }
+    if (option === 'rows' || option === 'both') {
+      range.format.autofitRows();
+    }
+    await context.sync();
+  });
+}
+
+/**
+ * Menyetel opsi tampilan sheet (Gridlines, Headings).
+ */
+export async function setSheetOptions(gridlines?: boolean, headings?: boolean): Promise<void> {
+  // @ts-ignore
+  return Excel.run(async (context) => {
+    const sheet = context.workbook.worksheets.getActiveWorksheet();
+     if (gridlines !== undefined) {
+      sheet.showGridlines = gridlines;
+    }
+    if (headings !== undefined) {
+      sheet.showHeadings = headings;
+    }
+    await context.sync();
+  });
+}
+
+/**
+ * Membekukan baris/kolom (Freeze Panes).
+ */
+export async function freezePanes(rows?: number, columns?: number, unfreeze?: boolean): Promise<void> {
+  // @ts-ignore
+  return Excel.run(async (context) => {
+    const sheet = context.workbook.worksheets.getActiveWorksheet();
+    if (unfreeze) {
+      sheet.freezePanes.unfreeze();
+    } else if (rows !== undefined && columns !== undefined) {
+      const cell = sheet.getCell(rows, columns);
+      sheet.freezePanes.freezeAt(cell);
+    } else if (rows !== undefined) {
+      sheet.freezePanes.freezeRows(rows);
+    } else if (columns !== undefined) {
+      sheet.freezePanes.freezeColumns(columns);
+    }
+    await context.sync();
+  });
+}
+
+/**
+ * Memicu kalkulasi ulang workbook secara penuh.
+ */
+export async function calculateWorkbook(): Promise<void> {
+  // @ts-ignore
+  return Excel.run(async (context) => {
+    context.application.calculate("FullRebuild");
+    await context.sync();
+  });
+}
+
+/**
+ * Menghapus baris duplikat berdasarkan kolom tertentu.
+ */
+export async function removeDuplicates(rangeAddress: string, columns: number[], hasHeaders: boolean): Promise<void> {
+  // @ts-ignore
+  return Excel.run(async (context) => {
+    const sheet = context.workbook.worksheets.getActiveWorksheet();
+    const range = sheet.getRange(rangeAddress);
+    range.removeDuplicates(columns, hasHeaders);
+    await context.sync();
+  });
+}
+
+/**
+ * Melindungi atau membuka proteksi sheet.
+ */
+export async function protectSheet(protect: boolean, password?: string): Promise<void> {
+  // @ts-ignore
+  return Excel.run(async (context) => {
+     const sheet = context.workbook.worksheets.getActiveWorksheet();
+    if (protect) {
+      sheet.protection.protect(undefined, password);
+    } else {
+      sheet.protection.unprotect(password);
+    }
+    await context.sync();
+  });
+}
+
+/**
+ * Mengelola sheet (add, delete, rename, activate).
+ */
+export async function manageSheet(
+  action: 'add' | 'delete' | 'rename' | 'activate', 
+  name: string, 
+  newName?: string
+): Promise<void> {
+  // @ts-ignore
+  return Excel.run(async (context) => {
+    const sheets = context.workbook.worksheets;
+    if (action === 'add') {
+      sheets.add(name);
+    } else {
+      const sheet = sheets.getItem(name);
+      if (action === 'delete') {
+        sheet.delete();
+      } else if (action === 'rename' && newName) {
+        sheet.name = newName;
+      } else if (action === 'activate') {
+        sheet.activate();
+      }
+    }
     await context.sync();
   });
 }

@@ -13,6 +13,19 @@ import {
   filterTableColumn, 
   createExcelChart, 
   createExcelPivotTable,
+  formatNumbers,
+  formatCells,
+  insertRange,
+  deleteRange,
+  clearRange,
+  mergeCells,
+  autofitRange,
+  setSheetOptions,
+  freezePanes,
+  calculateWorkbook,
+  removeDuplicates,
+  protectSheet,
+  manageSheet,
   WorkbookData
 } from './utils/excelService';
 import { getGeminiExcelAction, getDeepSeekExcelAction, ActionPlan } from './utils/geminiService';
@@ -291,6 +304,45 @@ export default function App({ isExcel }: AppProps) {
               break;
             case 'CREATE_PIVOT':
               await createExcelPivotTable(action.payload.source, action.payload.rowFields, action.payload.dataFields);
+              break;
+            case 'NUMBER_FORMAT':
+              await formatNumbers(action.payload.range, action.payload.format);
+              break;
+            case 'CELL_FORMAT':
+              await formatCells(action.payload.range, action.payload);
+              break;
+            case 'AUTO_FIT':
+              await autofitRange(action.payload.range, action.payload.option || 'columns');
+              break;
+            case 'CLEAR':
+              await clearRange(action.payload.range, action.payload.option || 'All');
+              break;
+            case 'INSERT_RANGE':
+              await insertRange(action.payload.range, action.payload.shift || 'Down');
+              break;
+            case 'DELETE_RANGE':
+              await deleteRange(action.payload.range, action.payload.shift || 'Up');
+              break;
+            case 'MERGE':
+              await mergeCells(action.payload.range, action.payload.merge !== false);
+              break;
+            case 'SET_SHEET_OPTIONS':
+              await setSheetOptions(action.payload.gridlines, action.payload.headings);
+              break;
+            case 'FREEZE_PANES':
+              await freezePanes(action.payload.rows, action.payload.columns, action.payload.unfreeze);
+              break;
+            case 'CALCULATE':
+              await calculateWorkbook();
+              break;
+            case 'REMOVE_DUPLICATES':
+              await removeDuplicates(action.payload.range, action.payload.columns, action.payload.hasHeaders !== false);
+              break;
+            case 'PROTECT_SHEET':
+              await protectSheet(action.payload.protect !== false, action.payload.password);
+              break;
+            case 'MANAGE_SHEET':
+              await manageSheet(action.payload.action, action.payload.name, action.payload.newName);
               break;
             default:
               throw new Error(`Aksi tidak dikenal: ${action.type}`);
@@ -694,6 +746,36 @@ function getStepDescription(action: any): string {
       return `Buat grafik ${action.payload.type} dari data ${action.payload.range}`;
     case 'CREATE_PIVOT':
       return `Buat Pivot Table baru dari sumber data ${action.payload.source}`;
+    case 'NUMBER_FORMAT':
+      return `Format angka kolom/sel ${action.payload.range} menjadi "${action.payload.format}"`;
+    case 'CELL_FORMAT':
+      return `Format gaya sel ${action.payload.range} (Gaya, Warna, Font)`;
+    case 'AUTO_FIT':
+      return `Pasangkan ukuran kolom/baris otomatis pada rentang ${action.payload.range}`;
+    case 'CLEAR':
+      return `Hapus isi/format pada rentang ${action.payload.range}`;
+    case 'INSERT_RANGE':
+      return `Sisipkan sel pada rentang ${action.payload.range} geser ke ${action.payload.shift === 'Down' ? 'Bawah' : 'Kanan'}`;
+    case 'DELETE_RANGE':
+      return `Hapus sel pada rentang ${action.payload.range} geser ke ${action.payload.shift === 'Up' ? 'Atas' : 'Kiri'}`;
+    case 'MERGE':
+      return `${action.payload.merge !== false ? 'Gabungkan' : 'Pisahkan'} sel pada rentang ${action.payload.range}`;
+    case 'SET_SHEET_OPTIONS':
+      return `Setel tampilan sheet (Gridlines: ${action.payload.gridlines !== undefined ? action.payload.gridlines : 'tetap'}, Headings: ${action.payload.headings !== undefined ? action.payload.headings : 'tetap'})`;
+    case 'FREEZE_PANES':
+      if (action.payload.unfreeze) return `Lepaskan pembekuan baris/kolom`;
+      return `Bekukan ${action.payload.rows ? `${action.payload.rows} baris` : ''}${action.payload.rows && action.payload.columns ? ' & ' : ''}${action.payload.columns ? `${action.payload.columns} kolom` : ''}`;
+    case 'CALCULATE':
+      return `Kalkulasi ulang seluruh rumus di workbook`;
+    case 'REMOVE_DUPLICATES':
+      return `Hapus baris duplikat pada area ${action.payload.range}`;
+    case 'PROTECT_SHEET':
+      return `${action.payload.protect !== false ? 'Kunci (protect)' : 'Buka kunci'} lembar kerja`;
+    case 'MANAGE_SHEET':
+      if (action.payload.action === 'add') return `Tambah sheet baru "${action.payload.name}"`;
+      if (action.payload.action === 'delete') return `Hapus sheet "${action.payload.name}"`;
+      if (action.payload.action === 'rename') return `Ganti nama sheet "${action.payload.name}" menjadi "${action.payload.newName}"`;
+      return `Aktifkan sheet "${action.payload.name}"`;
     default:
       return `Eksekusi aksi: ${action.type}`;
   }

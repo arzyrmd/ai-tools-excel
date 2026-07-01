@@ -4,7 +4,7 @@ import { SheetData, WorkbookData } from './excelService';
 export interface ActionPlan {
   explanation: string;
   actions: {
-    type: 'CREATE_TABLE' | 'WRITE_FORMULAS' | 'WRITE_VALUES' | 'SORT' | 'FILTER' | 'CREATE_CHART' | 'CREATE_PIVOT';
+    type: 'CREATE_TABLE' | 'WRITE_FORMULAS' | 'WRITE_VALUES' | 'SORT' | 'FILTER' | 'CREATE_CHART' | 'CREATE_PIVOT' | 'NUMBER_FORMAT' | 'CELL_FORMAT' | 'AUTO_FIT' | 'CLEAR' | 'INSERT_RANGE' | 'DELETE_RANGE' | 'MERGE' | 'SET_SHEET_OPTIONS' | 'FREEZE_PANES' | 'CALCULATE' | 'REMOVE_DUPLICATES' | 'PROTECT_SHEET' | 'MANAGE_SHEET';
     payload: any;
   }[];
 }
@@ -128,6 +128,151 @@ export function getDemoResponse(prompt: string, sheetData: SheetData): ActionPla
 
   const tableName = sheetData.tableName || "Table1";
   const rowCount = sheetData.rowCount;
+
+  // 0. FORMATTING & CURRENCY DEMO
+  if (query.includes('rupiah') || query.includes('currency') || query.includes('mata uang') || query.includes('format') || query.includes('warna') || query.includes('gaya') || query.includes('rapikan') || query.includes('gaji')) {
+    const currencyRanges: string[] = [];
+    sheetData.headers.forEach((h, idx) => {
+      const colName = h.toLowerCase();
+      if (colName.includes('harga') || colName.includes('total') || colName.includes('pemasukan') || colName.includes('pengeluaran') || colName.includes('saldo') || colName.includes('nominal') || colName.includes('gaji')) {
+        const colLetter = getColumnLetter(idx + (sheetData.columnIndex || 0));
+        currencyRanges.push(`${colLetter}2:${colLetter}${rowCount}`);
+      }
+    });
+
+    const actions: any[] = [];
+    
+    if (currencyRanges.length > 0) {
+      currencyRanges.forEach(range => {
+        actions.push({
+          type: 'NUMBER_FORMAT',
+          payload: {
+            range,
+            format: 'rupiah'
+          }
+        });
+      });
+    } else {
+      const lastColLetter = getColumnLetter(sheetData.columnCount - 1 + (sheetData.columnIndex || 0));
+      actions.push({
+        type: 'NUMBER_FORMAT',
+        payload: {
+          range: `${lastColLetter}2:${lastColLetter}${rowCount}`,
+          format: 'rupiah'
+        }
+      });
+    }
+
+    const firstColLetter = getColumnLetter(sheetData.columnIndex || 0);
+    const lastColLetter = getColumnLetter(sheetData.columnCount - 1 + (sheetData.columnIndex || 0));
+    actions.push({
+      type: 'CELL_FORMAT',
+      payload: {
+        range: `${firstColLetter}1:${lastColLetter}1`,
+        fillColor: '#1e3a8a',
+        fontColor: '#ffffff',
+        bold: true,
+        horizontalAlignment: 'Center'
+      }
+    });
+
+    actions.push({
+      type: 'AUTO_FIT',
+      payload: {
+        range: `${firstColLetter}1:${lastColLetter}${rowCount}`,
+        option: 'columns'
+      }
+    });
+
+    return {
+      explanation: "Saya akan memformat kolom nominal yang terdeteksi ke mata uang Rupiah (Rp), mewarnai baris header dengan latar belakang Biru Tua dan teks putih tebal, serta melakukan autofit kolom agar data Anda tertata rapi.",
+      actions
+    };
+  }
+
+  // 0.1 GRIDLINES & VIEW OPTIONS DEMO
+  if (query.includes('gridlines') || query.includes('garis pandu') || query.includes('tampilan') || query.includes('heading')) {
+    const showGrid = !query.includes('sembunyi') && !query.includes('hilang') && !query.includes('tanpa');
+    const showHead = !query.includes('sembunyi') && !query.includes('hilang') && !query.includes('tanpa');
+    return {
+      explanation: `Saya akan menyetel opsi tampilan lembar kerja: **Gridlines** diatur ke \`${showGrid}\` dan **Headings** diatur ke \`${showHead}\` sesuai instruksi Anda.`,
+      actions: [
+        {
+          type: 'SET_SHEET_OPTIONS',
+          payload: {
+            gridlines: showGrid,
+            headings: showHead
+          }
+        }
+      ]
+    };
+  }
+
+  // 0.2 FREEZE PANES DEMO
+  if (query.includes('freeze') || query.includes('beku') || query.includes('kunci baris')) {
+    const isUnfreeze = query.includes('unfreeze') || query.includes('cair') || query.includes('lepas');
+    return {
+      explanation: isUnfreeze 
+        ? "Saya akan melepaskan pembekuan panel (unfreeze panes) pada sheet aktif."
+        : "Saya akan membekukan baris pertama (freeze top row) agar tetap terlihat saat Anda menggulir halaman.",
+      actions: [
+        {
+          type: 'FREEZE_PANES',
+          payload: isUnfreeze ? { unfreeze: true } : { rows: 1 }
+        }
+      ]
+    };
+  }
+
+  // 0.3 PROTECT SHEET DEMO
+  if (query.includes('protect') || query.includes('kunci sheet') || query.includes('proteksi')) {
+    const isUnprotect = query.includes('unprotect') || query.includes('buka kunci') || query.includes('lepas proteksi');
+    return {
+      explanation: isUnprotect
+        ? "Saya akan membuka proteksi/kunci lembar kerja (unprotect sheet)."
+        : "Saya akan memproteksi lembar kerja (protect sheet) agar tidak bisa diubah secara tidak sengaja.",
+      actions: [
+        {
+          type: 'PROTECT_SHEET',
+          payload: { protect: !isUnprotect }
+        }
+      ]
+    };
+  }
+
+  // 0.4 MANAGE SHEET DEMO
+  if (query.includes('sheet baru') || query.includes('tambah sheet') || query.includes('buat sheet') || query.includes('hapus sheet') || query.includes('rename sheet') || query.includes('ganti nama sheet')) {
+    let actType: 'add' | 'delete' | 'rename' | 'activate' = 'add';
+    let targetName = "SheetBaru";
+    let newName: string | undefined;
+
+    if (query.includes('hapus')) {
+      actType = 'delete';
+      targetName = "Sheet1";
+    } else if (query.includes('rename') || query.includes('ganti nama') || query.includes('ubah nama')) {
+      actType = 'rename';
+      targetName = "Sheet1";
+      newName = "DataTerformat";
+    }
+
+    return {
+      explanation: actType === 'add' 
+        ? `Saya akan membuat sheet baru bernama **"${targetName}"**.`
+        : actType === 'delete'
+          ? `Saya akan menghapus sheet **"${targetName}"**.`
+          : `Saya akan mengganti nama sheet **"${targetName}"** menjadi **"${newName}"**.`,
+      actions: [
+        {
+          type: 'MANAGE_SHEET',
+          payload: {
+            action: actType,
+            name: targetName,
+            newName
+          }
+        }
+      ]
+    };
+  }
   
   // 1. PIVOT TABLE DEMO
   if (query.includes('pivot') || query.includes('ringkasan') || query.includes('rekapitulasi')) {
@@ -335,6 +480,14 @@ PENTING UNTUK KECERDASAN DAN AKURASI:
    - Selalu tulis Rumus Excel dalam BAHASA INGGRIS (seperti SUM, AVERAGE, COUNT, MIN, MAX, VLOOKUP, HLOOKUP, IF, COUNTIF, SUMIF, dll.) diawali tanda '='. Excel akan menerjemahkannya ke bahasa Excel lokal pengguna secara otomatis.
    - Buat formula yang dinamis merujuk ke baris sel yang tepat. Perhatikan OFFSET baris! Karena baris header berada pada baris ${ (activeSheet.rowIndex || 0) + 1 } dan baris data dimulai dari baris ${ (activeSheet.rowIndex || 0) + 2 }, maka untuk baris data pertama, rujuklah indeks baris ke-${ (activeSheet.rowIndex || 0) + 2 } (contoh: \`=AVERAGE(C${ (activeSheet.rowIndex || 0) + 2 }:E${ (activeSheet.rowIndex || 0) + 2 })\`).
    - Tentukan rentang sel secara presisi. Rentang data utama selalu dimulai dari baris ${ (activeSheet.rowIndex || 0) + 2 } dan berakhir di baris ${ (activeSheet.rowIndex || 0) + activeSheet.rowCount }.
+5. PEMBUATAN GRAFIK (CREATE_CHART):
+   - Microsoft Excel JS SDK tidak mendukung pembuatan grafik dari rentang sel non-kontigu (terpisah koma, contoh: "B1:B11,F1:F11").
+   - Selalu berikan satu rentang kontigu tunggal (single contiguous range) yang mencakup seluruh kolom data yang ingin divisualisasikan (contoh: "B1:F11" atau seluruh tabel "A1:G11"). Excel secara otomatis akan memetakan dan menyaring sumbu kategori serta nilai deretnya.
+6. DESAIN GAYA VISUAL (CELL_FORMAT & NUMBER_FORMAT):
+   - Selalu format header tabel agar terlihat profesional (contoh: warna latar biru tua '#1e3a8a', teks bold putih '#ffffff', perataan Center, dan border bawah tebal dengan borderStyle: "HeaderBorders").
+   - Selalu format baris total di bagian bawah agar berbeda (contoh: teks bold, border atas tipis dan bawah ganda dengan borderStyle: "TotalBorders").
+   - Selalu format angka nominal (seperti harga, gaji, pemasukan, pengeluaran, dll) menggunakan NUMBER_FORMAT dengan nilai "rupiah" jika pengguna meminta rupiah atau jika data berupa mata uang Rupiah.
+   - Panggil AUTO_FIT setelah menulis data agar semua kolom terlihat rapi dan tidak terpotong (lebar otomatis).
 
 Format Output JSON Harus Tepat Seperti Ini:
 {
@@ -363,6 +516,13 @@ Format Output JSON Harus Tepat Seperti Ini:
         "range": "A1:G11",
         "name": "DataNilaiSiswa"
       }
+    },
+    {
+      "type": "NUMBER_FORMAT",
+      "payload": {
+        "range": "C2:E11",
+        "format": "number"
+      }
     }
   ]
 }
@@ -373,8 +533,21 @@ Ketentuan Tipe Aksi:
 - "WRITE_VALUES": menulis nilai mentah biasa (string/number/array 2D) ke range sel tertentu.
 - "SORT": mengurutkan kolom pada tabel. Membutuhkan "tableName", "columnName", dan "direction" ('asc' atau 'desc').
 - "FILTER": memfilter kolom pada tabel. Membutuhkan "tableName", "columnName", "value", dan "operator" ('Equal' | 'Contains' | 'GreaterThan' | 'LessThan' | 'Clear').
-- "CREATE_CHART": membuat diagram grafis Excel asli. Membutuhkan "type" ('bar'|'line'|'pie'|'area'), "range" (rentang data grafik, contoh: "A1:G11" atau nama tabel "DataNilaiSiswa"), dan "title".
+- "CREATE_CHART": membuat diagram grafis Excel asli. Membutuhkan "type" ('bar'|'line'|'pie'|'area'), "range" (rentang data grafik), dan "title".
 - "CREATE_PIVOT": membuat Pivot Table di sheet baru. Membutuhkan "source" (range/tabel asal), "rowFields" (array nama kolom baris), dan "dataFields" (array nama kolom nilai numerik).
+- "NUMBER_FORMAT": memformat angka pada kolom/sel. Membutuhkan "range" dan "format" ('rupiah' | 'usd' | 'percent' | 'date' | 'number' | 'decimal' atau format Excel kustom). Gunakan format ini secara proaktif pada nilai nominal (seperti harga, gaji, total, dll.) jika pengguna meminta format mata uang/Rupiah.
+- "CELL_FORMAT": mengatur gaya visual sel. Membutuhkan "range" dan opsi format (semua opsional): "fillColor" (hex seperti '#1e3a8a'), "fontColor" (hex seperti '#ffffff'), "fontSize" (angka), "bold" (boolean), "italic" (boolean), "fontName" (string), "horizontalAlignment" ('Left'|'Center'|'Right'|'General'), "verticalAlignment" ('Top'|'Center'|'Bottom'), "borderStyle" ('None'|'Thin'|'DoubleBottom'|'AllBorders'|'HeaderBorders'|'TotalBorders').
+- "AUTO_FIT": menyesuaikan lebar kolom atau tinggi baris. Membutuhkan "range" dan "option" ('columns' | 'rows' | 'both').
+- "CLEAR": menghapus konten/format. Membutuhkan "range" dan "option" ('All' | 'Formats' | 'Contents').
+- "INSERT_RANGE": menyisipkan sel baru. Membutuhkan "range" dan "shift" ('Down' | 'Right').
+- "DELETE_RANGE": menghapus sel. Membutuhkan "range" dan "shift" ('Up' | 'Left').
+- "MERGE": menggabungkan/memisahkan sel. Membutuhkan "range" dan "merge" (boolean).
+- "SET_SHEET_OPTIONS": menyetel tampilan sheet. Membutuhkan "gridlines" (boolean, opsional) dan "headings" (boolean, opsional).
+- "FREEZE_PANES": membekukan panel. Membutuhkan "rows" (angka, opsional), "columns" (angka, opsional), dan "unfreeze" (boolean, opsional).
+- "CALCULATE": menghitung ulang rumus di workbook secara penuh. Tidak membutuhkan payload tambahan.
+- "REMOVE_DUPLICATES": menghapus baris duplikat. Membutuhkan "range", "columns" (array index kolom 0-indexed yang dicek), dan "hasHeaders" (boolean).
+- "PROTECT_SHEET": mengunci/membuka proteksi sheet. Membutuhkan "protect" (boolean) dan "password" (string, opsional).
+- "MANAGE_SHEET": mengelola lembar kerja. Membutuhkan "action" ('add'|'delete'|'rename'|'activate'), "name" (nama sheet target), dan "newName" (string untuk nama baru jika rename, opsional).
 
 Hanya hasilkan format JSON valid tanpa markdown tambahan.
 `;
@@ -464,6 +637,14 @@ PENTING UNTUK KECERDASAN DAN AKURASI:
    - Selalu tulis Rumus Excel dalam BAHASA INGGRIS (seperti SUM, AVERAGE, COUNT, MIN, MAX, VLOOKUP, HLOOKUP, IF, COUNTIF, SUMIF, dll.) diawali tanda '='. Excel akan menerjemahkannya ke bahasa Excel lokal pengguna secara otomatis.
    - Buat formula yang dinamis merujuk ke baris sel yang tepat. Perhatikan OFFSET baris! Karena baris header berada pada baris ${ (activeSheet.rowIndex || 0) + 1 } dan baris data dimulai dari baris ${ (activeSheet.rowIndex || 0) + 2 }, maka untuk baris data pertama, rujuklah indeks baris ke-${ (activeSheet.rowIndex || 0) + 2 } (contoh: \`=AVERAGE(C${ (activeSheet.rowIndex || 0) + 2 }:E${ (activeSheet.rowIndex || 0) + 2 })\`).
    - Tentukan rentang sel secara presisi. Rentang data utama selalu dimulai dari baris ${ (activeSheet.rowIndex || 0) + 2 } dan berakhir di baris ${ (activeSheet.rowIndex || 0) + activeSheet.rowCount }.
+5. PEMBUATAN GRAFIK (CREATE_CHART):
+   - Microsoft Excel JS SDK tidak mendukung pembuatan grafik dari rentang sel non-kontigu (terpisah koma, contoh: "B1:B11,F1:F11").
+   - Selalu berikan satu rentang kontigu tunggal (single contiguous range) yang mencakup seluruh kolom data yang ingin divisualisasikan (contoh: "B1:F11" atau seluruh tabel "A1:G11"). Excel secara otomatis akan memetakan dan menyaring sumbu kategori serta nilai deretnya.
+6. DESAIN GAYA VISUAL (CELL_FORMAT & NUMBER_FORMAT):
+   - Selalu format header tabel agar terlihat profesional (contoh: warna latar biru tua '#1e3a8a', teks bold putih '#ffffff', perataan Center, dan border bawah tebal dengan borderStyle: "HeaderBorders").
+   - Selalu format baris total di bagian bawah agar berbeda (contoh: teks bold, border atas tipis dan bawah ganda dengan borderStyle: "TotalBorders").
+   - Selalu format angka nominal (seperti harga, gaji, pemasukan, pengeluaran, dll) menggunakan NUMBER_FORMAT dengan nilai "rupiah" jika pengguna meminta rupiah atau jika data berupa mata uang Rupiah.
+   - Panggil AUTO_FIT setelah menulis data agar semua kolom terlihat rapi dan tidak terpotong (lebar otomatis).
 
 Format Output JSON Harus Tepat Seperti Ini (dan merupakan objek JSON valid tanpa teks lain):
 {
@@ -481,8 +662,8 @@ Format Output JSON Harus Tepat Seperti Ini (dan merupakan objek JSON valid tanpa
       "payload": {
         "range": "F2:G11",
         "formulas": [
-          ["=AVERAGE(C2:E2)", "=IF(F2>=75,\\"LULUS\\",\\"REMIDI\\")"],
-          ["=AVERAGE(C3:E3)", "=IF(F3>=75,\\"LULUS\\",\\"REMIDI\\")"]
+          ["=AVERAGE(C2:E2)", "=IF(F2>=75,\"LULUS\",\"REMIDI\")"],
+          ["=AVERAGE(C3:E3)", "=IF(F3>=75,\"LULUS\",\"REMIDI\")"]
         ]
       }
     },
@@ -491,6 +672,13 @@ Format Output JSON Harus Tepat Seperti Ini (dan merupakan objek JSON valid tanpa
       "payload": {
         "range": "A1:G11",
         "name": "DataNilaiSiswa"
+      }
+    },
+    {
+      "type": "NUMBER_FORMAT",
+      "payload": {
+        "range": "C2:E11",
+        "format": "number"
       }
     }
   ]
@@ -504,8 +692,21 @@ Ketentuan Tipe Aksi:
 - "FILTER": memfilter kolom pada tabel. Membutuhkan "tableName", "columnName", "value", dan "operator" ('Equal' | 'Contains' | 'GreaterThan' | 'LessThan' | 'Clear').
 - "CREATE_CHART": membuat diagram grafis Excel asli. Membutuhkan "type" ('bar'|'line'|'pie'|'area'), "range" (rentang data grafik), dan "title".
 - "CREATE_PIVOT": membuat Pivot Table di sheet baru. Membutuhkan "source" (range/tabel asal), "rowFields" (array nama kolom baris), dan "dataFields" (array nama kolom nilai numerik).
+- "NUMBER_FORMAT": memformat angka pada kolom/sel. Membutuhkan "range" dan "format" ('rupiah' | 'usd' | 'percent' | 'date' | 'number' | 'decimal' atau format Excel kustom). Gunakan format ini secara proaktif pada nilai nominal (seperti harga, gaji, total, dll.) jika pengguna meminta format mata uang/Rupiah.
+- "CELL_FORMAT": mengatur gaya visual sel. Membutuhkan "range" dan opsi format (semua opsional): "fillColor" (hex seperti '#1e3a8a'), "fontColor" (hex seperti '#ffffff'), "fontSize" (angka), "bold" (boolean), "italic" (boolean), "fontName" (string), "horizontalAlignment" ('Left'|'Center'|'Right'|'General'), "verticalAlignment" ('Top'|'Center'|'Bottom'), "borderStyle" ('None'|'Thin'|'DoubleBottom'|'AllBorders'|'HeaderBorders'|'TotalBorders').
+- "AUTO_FIT": menyesuaikan lebar kolom atau tinggi baris. Membutuhkan "range" dan "option" ('columns' | 'rows' | 'both').
+- "CLEAR": menghapus konten/format. Membutuhkan "range" dan "option" ('All' | 'Formats' | 'Contents').
+- "INSERT_RANGE": menyisipkan sel baru. Membutuhkan "range" dan "shift" ('Down' | 'Right').
+- "DELETE_RANGE": menghapus sel. Membutuhkan "range" dan "shift" ('Up' | 'Left').
+- "MERGE": menggabungkan/memisahkan sel. Membutuhkan "range" dan "merge" (boolean).
+- "SET_SHEET_OPTIONS": menyetel tampilan sheet. Membutuhkan "gridlines" (boolean, opsional) dan "headings" (boolean, opsional).
+- "FREEZE_PANES": membekukan panel. Membutuhkan "rows" (angka, opsional), "columns" (angka, opsional), dan "unfreeze" (boolean, opsional).
+- "CALCULATE": menghitung ulang rumus di workbook secara penuh. Tidak membutuhkan payload tambahan.
+- "REMOVE_DUPLICATES": menghapus baris duplikat. Membutuhkan "range", "columns" (array index kolom 0-indexed yang dicek), dan "hasHeaders" (boolean).
+- "PROTECT_SHEET": mengunci/membuka proteksi sheet. Membutuhkan "protect" (boolean) dan "password" (string, opsional).
+- "MANAGE_SHEET": mengelola lembar kerja. Membutuhkan "action" ('add'|'delete'|'rename'|'activate'), "name" (nama sheet target), dan "newName" (string untuk nama baru jika rename, opsional).
 
-Hanya hasilkan format JSON valid tanpa markdown tambahan (\`\`\`json \`\`\`).
+Hanya hasilkan format JSON valid tanpa markdown tambahan.
 `;
 
   const response = await fetch("https://api.deepseek.com/chat/completions", {
